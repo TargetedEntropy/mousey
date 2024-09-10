@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time Mouse Tracker and YouTube Player</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .cursor {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .videos-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        .video {
+            flex: 1 1 50%;
+            padding: 5px;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            max-width: 500px;
+            max-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <form id="videoForm">
+        <input type="text" id="videoUrl" placeholder="Enter YouTube video URL" required>
+        <button type="submit">Add Video</button>
+    </form>
+    
+    <div class="videos-container" id="videosContainer"></div>
+
+    <!-- Socket.IO script -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Main script -->
+    <script>
+        const socket = io();
+
+        /** Mouse Cursor Tracking **/
+        const myCursor = document.createElement('div');
+        myCursor.classList.add('cursor');
+        document.body.appendChild(myCursor);
+
+        document.addEventListener('mousemove', (event) => {
+            const { clientX: x, clientY: y } = event;
+            myCursor.style.left = `${x}px`;
+            myCursor.style.top = `${y}px`;
+            socket.emit('mouse-move', { x, y });
+        });
+
+        socket.on('update-mouse', (data) => {
+            let cursor = document.querySelector(`.cursor-${data.id}`);
+            if (!cursor) {
+                cursor = document.createElement('div');
+                cursor.classList.add('cursor', `cursor-${data.id}`);
+                cursor.style.backgroundColor = 'blue';
+                document.body.appendChild(cursor);
+            }
+            cursor.style.left = `${data.x}px`;
+            cursor.style.top = `${data.y}px`;
+        });
+
+        socket.on('remove-cursor', (id) => {
+            const cursor = document.querySelector(`.cursor-${id}`);
+            if (cursor) {
+                cursor.remove();
+            }
+        });
+
+        /** YouTube Video Synchronization **/
+        const videosContainer = document.getElementById('videosContainer');
+        const videoForm = document.getElementById('videoForm');
+        const videoUrlInput = document.getElementById('videoUrl');
+
+        let videoQueue = [];
+        let players = {};
+        let youtubeAPIReady = false;
+        let pendingVideos = [];
+
+        videoForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const videoUrl = videoUrlInput.value;
+            const videoId = extractVideoId(videoUrl);
+
+            if (videoId) {
+                socket.emit('new-video', videoId);
+                videoUrlInput.value = '';
+            } else {
+                alert("Please enter a valid YouTube URL");
+            }
+        });
+
+        function extractVideoId(url) {
+            const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        socket.on('video-queue', (updatedQueue) => {
+            videoQueue = updatedQueue;
+            videosContainer.innerHTML = '';
+            players = {};
+
+            if (youtubeAPIReady) {
+                videoQueue.forEach(videoId => {
+                    addVideo(videoId);
+                });
+                resizeVideos();
+            } else {
+                pendingVideos = [...videoQueue];
+            }
+        });
+
+        function addVideo(videoId) {
+            const videoWrapper = document.createElement('div');
+            videoWrapper.classList.add('video');
+
+            const playerDiv = document.createElement('div');
+            playerDiv.id = `player-${videoId}`;
+            videoWrapper.appendChild(playerDiv);
+            videosContainer.appendChild(videoWrapper);
+
+            players[videoId] = new YT.Player(`player-${videoId}`, {
+                videoId: videoId,
+                events: {
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        function resizeVideos() {
+            const numVideos = videoQueue.length;
+            const flexBasis = numVideos > 2 ? '25%' : '50%';
+
+            Array.from(document.getElementsByClassName('video')).forEach(videoWrapper => {
+                videoWrapper.style.flexBasis = flexBasis;
+            });
+        }
+
+        function onPlayerStateChange(event) {
+            const player = event.target;
+            const currentTime = player.getCurrentTime();
+
+            if (event.data === YT.PlayerState.PLAYING) {
+                socket.emit('sync-video-play', currentTime);
+            } else if (event.data === YT.PlayerState.PAUSED) {
+                socket.emit('sync-video-pause');
+            }
+        }
+
+        socket.on('play-video', (currentTime) => {
+            for (let videoId in players) {
+                players[videoId].seekTo(currentTime, true);
+                players[videoId].playVideo();
+            }
+        });
+
+        socket.on('pause-video', () => {
+            for (let videoId in players) {
+                players[videoId].pauseVideo();
+            }
+        });
+
+        /** Load the YouTube IFrame API **/
+        let tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+
+        function onYouTubeIframeAPIReady() {
+            youtubeAPIReady = true;
+
+            pendingVideos.forEach(videoId => {
+                addVideo(videoId);
+            });
+            resizeVideos();
+            pendingVideos = [];
+        }
+    </script>
+</body>
+</html>
