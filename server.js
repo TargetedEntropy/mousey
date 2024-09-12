@@ -26,7 +26,7 @@ io.on('connection', (socket) => {
     // Listen for new video submissions
     socket.on('new-video', (videoId) => {
         // Add the video to the global queue
-        if (videoQueue.length >= 4) {
+        if (videoQueue.length >= 3) {
             videoQueue.shift(); // Remove the oldest video if the queue exceeds 4
         }
         videoQueue.push(videoId);
