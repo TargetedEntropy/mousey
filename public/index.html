@@ -158,11 +158,16 @@
             });
         }
 
+        let lastSyncTime = 0;
+        const SYNC_INTERVAL = 5000; // Sync every 5 seconds
+        
         function onPlayerStateChange(event) {
             const player = event.target;
             const currentTime = player.getCurrentTime();
-
-            if (event.data === YT.PlayerState.PLAYING) {
+            const now = Date.now();
+        
+            if (event.data === YT.PlayerState.PLAYING && now - lastSyncTime > SYNC_INTERVAL) {
+                lastSyncTime = now;
                 socket.emit('sync-video-play', currentTime);
             } else if (event.data === YT.PlayerState.PAUSED) {
                 socket.emit('sync-video-pause');
