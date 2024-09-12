@@ -32,10 +32,10 @@
             padding: 5px;
         }
         iframe {
-            width: 100%;
-            height: 100%;
-            max-width: 500px;
-            max-height: 300px;
+            width: 850px;  
+            height: 450px; 
+            max-width: 900px;
+            max-height: 600px;
         }
     </style>
 </head>
@@ -140,6 +140,8 @@
             videosContainer.appendChild(videoWrapper);
 
             players[videoId] = new YT.Player(`player-${videoId}`, {
+                height: '390',
+                width: '640',
                 videoId: videoId,
                 events: {
                     'onStateChange': onPlayerStateChange
@@ -149,7 +151,7 @@
 
         function resizeVideos() {
             const numVideos = videoQueue.length;
-            const flexBasis = numVideos > 2 ? '25%' : '50%';
+            const flexBasis = numVideos > 2 ? '50%' : '100%';
 
             Array.from(document.getElementsByClassName('video')).forEach(videoWrapper => {
                 videoWrapper.style.flexBasis = flexBasis;
