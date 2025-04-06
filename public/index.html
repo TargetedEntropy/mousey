@@ -43,7 +43,8 @@
     <form id="videoForm">
         <input type="text" id="videoUrl" placeholder="Enter YouTube video URL" required>
         <button type="submit">Add Video</button>
-    </form>
+        <button type="button" id="clearQueueBtn">Clear Queue</button> <!-- New button -->
+    </form>    
     
     <div class="videos-container" id="videosContainer"></div>
 
@@ -58,6 +59,10 @@
         const myCursor = document.createElement('div');
         myCursor.classList.add('cursor');
         document.body.appendChild(myCursor);
+
+        document.getElementById('clearQueueBtn').addEventListener('click', () => {
+            socket.emit('clear-queue');  // Send a clear queue event to the server
+        });        
 
         document.addEventListener('mousemove', (event) => {
             const { clientX: x, clientY: y } = event;
@@ -186,6 +191,7 @@
                 players[videoId].pauseVideo();
             }
         });
+        
 
         /** Load the YouTube IFrame API **/
         let tag = document.createElement('script');

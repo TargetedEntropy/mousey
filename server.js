@@ -20,6 +20,22 @@ io.on('connection', (socket) => {
     // Send the current video queue to the newly connected user
     socket.emit('video-queue', videoQueue);
 
+    // Send the current video queue to the newly connected user
+    socket.on('video-queue', (updatedQueue) => {
+        videoQueue = updatedQueue;
+        videosContainer.innerHTML = ''; // Clear the video container
+        players = {}; // Reset the players
+    
+        if (youtubeAPIReady) {
+            videoQueue.forEach(videoId => {
+                addVideo(videoId);
+            });
+            resizeVideos();
+        } else {
+            pendingVideos = [...videoQueue];
+        }
+    });
+
     // Send existing cursors to the new user
     socket.emit('init-cursors', cursors);
 
@@ -56,6 +72,14 @@ io.on('connection', (socket) => {
     socket.on('sync-video-pause', () => {
         socket.broadcast.emit('pause-video');
     });
+
+    // Listen for clear queue event
+    socket.on('clear-queue', () => {
+        videoQueue = []; // Clear the video queue
+        io.emit('video-queue', videoQueue); // Send the empty queue to all clients
+    });    
+
+    
 });
 
 // Start the server
